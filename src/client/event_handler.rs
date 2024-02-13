@@ -92,6 +92,11 @@ pub trait EventHandler: Send + Sync {
     #[cfg(not(feature = "cache"))]
     async fn channel_update(&self, _ctx: Context, _new_data: Channel) {}
 
+    ///Dispatched when a guild audit log entry is created.
+    ///
+    /// Provides an Audit Log Entry.
+    async fn guild_audit_log_create(&self, _ctx: Context, _log: AuditLogEntry) {}
+
     /// Dispatched when a user is banned from a guild.
     ///
     /// Provides the guild's id and the banned user's data.

@@ -97,6 +97,13 @@ pub struct ChannelUpdateEvent {
     pub channel: Channel,
 }
 
+/// [Discord docs](https://discord.com/developers/docs/topics/gateway-events#guild-audit-log-entry-create).
+#[derive(Debug, Deserialize, Serialize)]
+#[non_exhaustive]
+pub struct GuildAuditLogCreateEvent {
+    pub audit_log_entry: AuditLogEntry,
+}
+
 /// [Discord docs](https://discord.com/developers/docs/topics/gateway#guild-ban-add).
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[non_exhaustive]
@@ -276,13 +283,7 @@ impl<'de> Deserialize<'de> for GuildMembersChunkEvent {
                     })
                     .collect();
 
-                Ok(GuildMembersChunkEvent {
-                    guild_id,
-                    members,
-                    chunk_index,
-                    chunk_count,
-                    nonce,
-                })
+                Ok(GuildMembersChunkEvent { guild_id, members, chunk_index, chunk_count, nonce })
             }
         }
 
@@ -300,9 +301,7 @@ pub struct GuildRoleCreateEvent {
 
 impl<'de> Deserialize<'de> for GuildRoleCreateEvent {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> StdResult<Self, D::Error> {
-        Ok(Self {
-            role: roles::deserialize_event(deserializer)?,
-        })
+        Ok(Self { role: roles::deserialize_event(deserializer)? })
     }
 }
 
@@ -323,9 +322,7 @@ pub struct GuildRoleUpdateEvent {
 
 impl<'de> Deserialize<'de> for GuildRoleUpdateEvent {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> StdResult<Self, D::Error> {
-        Ok(Self {
-            role: roles::deserialize_event(deserializer)?,
-        })
+        Ok(Self { role: roles::deserialize_event(deserializer)? })
     }
 }
 
@@ -876,6 +873,7 @@ pub enum Event {
     ///
     /// [`EventHandler::channel_update`]: crate::client::EventHandler::channel_update
     ChannelUpdate(ChannelUpdateEvent),
+    GuildAuditLogCreate(GuildAuditLogCreateEvent),
     GuildBanAdd(GuildBanAddEvent),
     GuildBanRemove(GuildBanRemoveEvent),
     GuildCreate(GuildCreateEvent),
@@ -1059,6 +1057,9 @@ macro_rules! with_related_ids_for_event_types {
                 channel_id: Some(e.channel.id()),
                 message_id: Never,
             },
+            Self::GuildAuditLogCreate, Self::GuildAuditLogCreate(e) => {
+                audit_log_entry: Some(e.audit_log_entry),
+            }
             Self::GuildBanAdd, Self::GuildBanAdd(e) => {
                 user_id: Some(e.user.id),
                 guild_id: Some(e.guild_id),
@@ -1490,6 +1491,7 @@ impl Event {
             Self::ChannelDelete(_) => EventType::ChannelDelete,
             Self::ChannelPinsUpdate(_) => EventType::ChannelPinsUpdate,
             Self::ChannelUpdate(_) => EventType::ChannelUpdate,
+            Self::GuildAuditLogCreate(_) => EventType::GuildAuditLogCreate,
             Self::GuildBanAdd(_) => EventType::GuildBanAdd,
             Self::GuildBanRemove(_) => EventType::GuildBanRemove,
             Self::GuildCreate(_) => EventType::GuildCreate,
@@ -1695,10 +1697,7 @@ pub fn deserialize_event_with_type(kind: EventType, v: Value) -> Result<Event> {
         EventType::GuildScheduledEventUserRemove => {
             Event::GuildScheduledEventUserRemove(from_value(v)?)
         },
-        EventType::Other(kind) => Event::Unknown(UnknownEvent {
-            kind,
-            value: v,
-        }),
+        EventType::Other(kind) => Event::Unknown(UnknownEvent { kind, value: v }),
     })
 }
 
@@ -1750,6 +1749,10 @@ pub enum EventType {
     ///
     /// This maps to [`ChannelUpdateEvent`].
     ChannelUpdate,
+    /// Indicator that a guild audit log entry create payload was received.
+    ///
+    /// This maps to [`GuildAuditLogCreateEvent`].
+    GuildAuditLogCreate,
     /// Indicator that a guild ban addition payload was received.
     ///
     /// This maps to [`GuildBanAddEvent`].
@@ -2034,6 +2037,7 @@ impl EventType {
     const CHANNEL_DELETE: &'static str = "CHANNEL_DELETE";
     const CHANNEL_PINS_UPDATE: &'static str = "CHANNEL_PINS_UPDATE";
     const CHANNEL_UPDATE: &'static str = "CHANNEL_UPDATE";
+    const GUILD_AUDIT_LOG_CREATE: &'static str = "GUILD_AUDIT_LOG_CREATE";
     const GUILD_BAN_ADD: &'static str = "GUILD_BAN_ADD";
     const GUILD_BAN_REMOVE: &'static str = "GUILD_BAN_REMOVE";
     const GUILD_CREATE: &'static str = "GUILD_CREATE";
@@ -2103,6 +2107,7 @@ impl EventType {
             Self::ChannelDelete => Some(Self::CHANNEL_DELETE),
             Self::ChannelPinsUpdate => Some(Self::CHANNEL_PINS_UPDATE),
             Self::ChannelUpdate => Some(Self::CHANNEL_UPDATE),
+            Self::GuildAuditLogCreate => Some(Self::GUILD_AUDIT_LOG_CREATE),
             Self::GuildBanAdd => Some(Self::GUILD_BAN_ADD),
             Self::GuildBanRemove => Some(Self::GUILD_BAN_REMOVE),
             Self::GuildCreate => Some(Self::GUILD_CREATE),
@@ -2197,6 +2202,7 @@ impl<'de> Deserialize<'de> for EventType {
                     EventType::CHANNEL_DELETE => EventType::ChannelDelete,
                     EventType::CHANNEL_PINS_UPDATE => EventType::ChannelPinsUpdate,
                     EventType::CHANNEL_UPDATE => EventType::ChannelUpdate,
+                    EventType::GUILD_AUDIT_LOG_CREATE => EventType::GuildAuditLogCreate,
                     EventType::GUILD_BAN_ADD => EventType::GuildBanAdd,
                     EventType::GUILD_BAN_REMOVE => EventType::GuildBanRemove,
                     EventType::GUILD_CREATE => EventType::GuildCreate,
